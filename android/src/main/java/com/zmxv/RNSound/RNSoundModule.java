@@ -7,6 +7,7 @@ import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnErrorListener;
 import android.net.Uri;
 import android.media.AudioManager;
+import android.os.Build;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
@@ -31,7 +32,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
   ReactApplicationContext context;
   final static Object NULL = null;
   String category;
-  Boolean mixWithOthers = true;
+  Boolean duckAudio = true;
   Double focusedPlayerKey;
   Boolean wasPlayingBeforeFocusChange = false;
 
@@ -59,7 +60,9 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
   @ReactMethod
   public void prepare(final String fileName, final Double key, final ReadableMap options, final Callback callback) {
     MediaPlayer player = createMediaPlayer(fileName);
-    if (options.hasKey("speed") && android.os.Build.VERSION.SDK_INT >= 23) {
+    Activity mCurrentActivity = getCurrentActivity();
+
+    if (options.hasKey("speed") && Build.VERSION.SDK_INT >= 23) {
       player.setPlaybackParams(player.getPlaybackParams().setSpeed((float)options.getDouble("speed")));
     }
     if (player == null) {
@@ -100,6 +103,9 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       }
       if (category != null) {
         player.setAudioStreamType(category);
+        if (mCurrentActivity != null) {
+          mCurrentActivity.setVolumeControlStream(category);
+        }
       }
     }
 
@@ -236,13 +242,11 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
     }
 
     // Request audio focus in Android system
-    if (!this.mixWithOthers) {
-      AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-
-      audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-
-      this.focusedPlayerKey = key;
-    }
+    AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+    final int audioFocusRequest = !this.duckAudio 
+      ? AudioManager.AUDIOFOCUS_GAIN : AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+    audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, audioFocusRequest);
+    this.focusedPlayerKey = key;
 
     player.setOnCompletionListener(new OnCompletionListener() {
       boolean callbackWasCalled = false;
@@ -302,7 +306,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
     }
 
     // Release audio focus in Android system
-    if (!this.mixWithOthers && key == this.focusedPlayerKey) {
+    if (!this.duckAudio && key == this.focusedPlayerKey) {
       AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
       audioManager.abandonAudioFocus(this);
     }
@@ -327,7 +331,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       this.playerPool.remove(key);
 
       // Release audio focus in Android system
-      if (!this.mixWithOthers && key == this.focusedPlayerKey) {
+      if (!this.duckAudio && key == this.focusedPlayerKey) {
         AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         audioManager.abandonAudioFocus(this);
       }
@@ -388,7 +392,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
 
   @ReactMethod
   public void setSpeed(final Double key, final Float speed) {
-	if (android.os.Build.VERSION.SDK_INT < 23) {
+	if (Build.VERSION.SDK_INT < 23) {
 	  Log.w("RNSoundModule", "setSpeed ignored due to sdk limit");
 	  return;
 	}
@@ -401,7 +405,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
 
   @ReactMethod
   public void setPitch(final Double key, final Float pitch) {
-    if (android.os.Build.VERSION.SDK_INT < 23) {
+    if (Build.VERSION.SDK_INT < 23) {
       Log.w("RNSoundModule", "setPitch ignored due to sdk limit");
       return;
     }
@@ -446,14 +450,19 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
   }
 
   @ReactMethod
-  public void setCategory(final String category, final Boolean mixWithOthers) {
+  public void setCategory(final String category, final Boolean duckAudio) {
     this.category = category;
-    this.mixWithOthers = mixWithOthers;
+    this.duckAudio = duckAudio;
+
+    if(!this.duckAudio) {
+    	AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+      audioManager.abandonAudioFocus(this);
+    }
   }
 
   @Override
   public void onAudioFocusChange(int focusChange) {
-    if (!this.mixWithOthers) {
+    if (!this.duckAudio) {
       MediaPlayer player = this.playerPool.get(this.focusedPlayerKey);
 
       if (player != null) {

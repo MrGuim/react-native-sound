@@ -27,7 +27,6 @@ declare class Sound {
    * to regain access to the audio stack.
    *
    * @param category AVAudioSession category
-   * @param mixWithOthers Can be set to true to force mixing with other audio sessions.
    */
   static setActive(active: boolean): void
 
@@ -37,16 +36,15 @@ declare class Sound {
    * Parameter options: "Ambient", "SoloAmbient", "Playback", "Record", "PlayAndRecord", "AudioProcessing", "MultiRoute".
    *
    * @param category AVAudioSession category
-   * @param mixWithOthers Can be set to true to force mixing with other audio sessions.
+   * @param duckAudio Can be set to true to force duck other audio sessions.
    */
-  static setCategory(category: AVAudioSessionCategory, mixWithOthers?: boolean): void
+  static setCategory(category: AVAudioSessionCategory, duckAudio?: boolean): void
 
   /**
    * Sets AVAudioSession mode, which works in conjunction with the category to determine audio mixing behavior.
    * Parameter options: "Default", "VoiceChat", "VideoChat", "GameChat", "VideoRecording", "Measurement", "MoviePlayback", "SpokenAudio".
    *
    * @param mode AVAudioSession mode
-   * @param mixWithOthers Can be set to true to force mixing with other audio sessions.
    */
   static setMode(mode: AVAudioSessionMode): void
 

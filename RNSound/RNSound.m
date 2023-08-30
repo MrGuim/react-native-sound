@@ -147,8 +147,8 @@ RCT_EXPORT_METHOD(setMode : (NSString *)modeName) {
 }
 
 RCT_EXPORT_METHOD(setCategory
-                  : (NSString *)categoryName mixWithOthers
-                  : (BOOL)mixWithOthers) {
+                  : (NSString *)categoryName duckAudio
+                  : (BOOL)duckAudio) {
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSString *category = nil;
 
@@ -173,13 +173,14 @@ RCT_EXPORT_METHOD(setCategory
     }
 
     if (category) {
-        if (mixWithOthers) {
+        if (duckAudio) {
             [session setCategory:category
-                     withOptions:AVAudioSessionCategoryOptionMixWithOthers |
-                                 AVAudioSessionCategoryOptionAllowBluetooth
+                     withOptions:AVAudioSessionCategoryOptionDuckOthers
                            error:nil];
         } else {
-            [session setCategory:category error:nil];
+            [session setCategory:category 
+                      withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                            error:nil];
         }
     }
 }
@@ -198,18 +199,17 @@ RCT_EXPORT_METHOD(prepare
     NSError *error;
     NSURL *fileNameUrl;
     AVAudioPlayer *player;
-    NSString* fileNameEscaped = [fileName stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
 
-    if ([fileNameEscaped hasPrefix:@"http"]) {
-        fileNameUrl = [NSURL URLWithString:fileNameEscaped];
+    if ([fileName hasPrefix:@"http"]) {
+        fileNameUrl = [NSURL URLWithString:fileName];
         NSData *data = [NSData dataWithContentsOfURL:fileNameUrl];
         player = [[AVAudioPlayer alloc] initWithData:data error:&error];
-    } else if ([fileNameEscaped hasPrefix:@"ipod-library://"]) {
-        fileNameUrl = [NSURL URLWithString:fileNameEscaped];
+    } else if ([fileName hasPrefix:@"ipod-library://"]) {
+        fileNameUrl = [NSURL URLWithString:fileName];
         player = [[AVAudioPlayer alloc] initWithContentsOfURL:fileNameUrl
                                                         error:&error];
     } else {
-        fileNameUrl = [NSURL URLWithString:fileNameEscaped];
+        fileNameUrl = [NSURL URLWithString:fileName];
         player = [[AVAudioPlayer alloc] initWithContentsOfURL:fileNameUrl
                                                         error:&error];
     }
