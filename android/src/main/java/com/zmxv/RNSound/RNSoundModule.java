@@ -111,6 +111,12 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       }
     }
 
+    // Request audio focus in Android system
+    AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+    final int audioFocusRequest = !this.duckAudio 
+      ? AudioManager.AUDIOFOCUS_GAIN : AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+    audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, audioFocusRequest);
+
     player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
       boolean callbackWasCalled = false;
 
@@ -131,6 +137,24 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
 
     });
 
+    player.setOnCompletionListener(new OnCompletionListener() {
+      boolean callbackWasCalled = false;
+
+      @Override
+      public synchronized void onCompletion(MediaPlayer mp) {
+        if (!mp.isLooping()) {
+          setOnPlay(false, key);
+          if (callbackWasCalled) return;
+          callbackWasCalled = true;
+          try {
+            callback.invoke(true);
+          } catch (Exception e) {
+              //Catches the exception: java.lang.RuntimeException·Illegal callback invocation from native module
+          }
+        }
+      }
+    });
+
     player.setOnErrorListener(new OnErrorListener() {
       boolean callbackWasCalled = false;
 
@@ -138,11 +162,17 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       public synchronized boolean onError(MediaPlayer mp, int what, int extra) {
         if (callbackWasCalled) return true;
         callbackWasCalled = true;
+        final wasPlaying = player.isPlaying();
+        setOnPlay(false, key);
         try {
           WritableMap props = Arguments.createMap();
           props.putInt("what", what);
           props.putInt("extra", extra);
-          callback.invoke(props, NULL);
+          if (wasPlaying) {
+            callback.invoke(true);
+          } else {
+            callback.invoke(props, NULL);
+          }
         } catch(RuntimeException runtimeException) {
           // The callback was already invoked
           Log.e("RNSoundModule", "Exception", runtimeException);
@@ -243,46 +273,8 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       return;
     }
 
-    // Request audio focus in Android system
-    AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-    final int audioFocusRequest = !this.duckAudio 
-      ? AudioManager.AUDIOFOCUS_GAIN : AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
-    audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, audioFocusRequest);
     this.focusedPlayerKey = key;
 
-    player.setOnCompletionListener(new OnCompletionListener() {
-      boolean callbackWasCalled = false;
-
-      @Override
-      public synchronized void onCompletion(MediaPlayer mp) {
-        if (!mp.isLooping()) {
-          setOnPlay(false, key);
-          if (callbackWasCalled) return;
-          callbackWasCalled = true;
-          try {
-            callback.invoke(true);
-          } catch (Exception e) {
-              //Catches the exception: java.lang.RuntimeException·Illegal callback invocation from native module
-          }
-        }
-      }
-    });
-    player.setOnErrorListener(new OnErrorListener() {
-      boolean callbackWasCalled = false;
-
-      @Override
-      public synchronized boolean onError(MediaPlayer mp, int what, int extra) {
-        setOnPlay(false, key);
-        if (callbackWasCalled) return true;
-        callbackWasCalled = true;
-        try {
-          callback.invoke(true);
-        } catch (Exception e) {
-          //Catches the exception: java.lang.RuntimeException·Illegal callback invocation from native module
-        }
-        return true;
-      }
-    });
     player.start();
     setOnPlay(true, key);
   }
