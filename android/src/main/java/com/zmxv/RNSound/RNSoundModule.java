@@ -162,7 +162,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
       public synchronized boolean onError(MediaPlayer mp, int what, int extra) {
         if (callbackWasCalled) return true;
         callbackWasCalled = true;
-        final wasPlaying = player.isPlaying();
+        final int wasPlaying = player.isPlaying();
         setOnPlay(false, key);
         try {
           WritableMap props = Arguments.createMap();
